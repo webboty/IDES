@@ -1,0 +1,39 @@
+[project]
+name = "ides"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.115",
+    "uvicorn[standard]>=0.30",
+    "aiosqlite>=0.20",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+    "pdfplumber>=0.11",
+    "pymupdf>=1.24",
+    "pdf2image>=1.17",
+    "pytesseract>=0.3",
+    "Pillow>=10.0",
+    "opencv-python-headless>=4.9",
+    "openai>=1.30",
+    "langdetect>=1.0",
+    "httpx>=0.27",
+    "passlib>=1.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "httpx", "pytest-cov"]
+
+[project.scripts]
+ides = "ides.main:cli"
+
+[tool.setuptools.packages.find]
+include = ["ides*"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

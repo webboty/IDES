@@ -1,0 +1,64 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+  master_admin_key: "${IDES_ADMIN_KEY}"
+
+storage:
+  base_path: "./data"
+
+providers:
+  local:
+    base_url: "http://192.168.1.141:11435/v1"
+    api_key: "not-needed"
+    timeout: 180
+  openai:
+    base_url: "https://api.openai.com/v1"
+    api_key: "${OPENAI_API_KEY}"
+    timeout: 60
+
+models:
+  vision:
+    provider: "local"
+    name: "qwen3.5-35b-a3b@bf16"
+    max_tokens: 4000
+  merge:
+    provider: "local"
+    name: "qwen3.5-35b-a3b@bf16"
+    max_tokens: 4000
+  filter:
+    provider: "openai"
+    name: "gpt-5.4-nano"
+    max_tokens: 200
+  image_describe:
+    provider: "local"
+    name: "qwen3.5-35b-a3b@bf16"
+    max_tokens: 500
+
+extraction:
+  dpi:
+    vision: 200
+    ocr: 300
+  ocr_languages: "deu+eng+rus"
+  max_pages: 50
+  skip_boilerplate: true
+  boilerplate_patterns:
+    - "(?i)allgemeine.{0,5}geschäft"
+    - "(?i)terms.{0,5}(and|&)conditions"
+    - "(?i)datenschutz"
+    - "(?i)impressum"
+    - "(?i)privacy.{0,5}policy"
+
+thresholds:
+  text_rich: 500
+  text_moderate: 200
+  text_sparse: 50
+  min_image_size: 100
+
+retry:
+  max_attempts: 3
+  backoff_base: 5
+
+queue:
+  max_concurrent_jobs: 2
+  job_timeout: 600
+  worker_poll_interval: 2
