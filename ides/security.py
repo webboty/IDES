@@ -60,7 +60,8 @@ def create_auth_middleware(app: Any, config: AppConfig):
 
         if path.startswith("/admin"):
             admin_key = request.headers.get("X-Admin-Key")
-            if admin_key != config.server.master_admin_key:
+            expected = config.server.master_admin_key
+            if not expected or not admin_key or admin_key != expected:
                 return JSONResponse(
                     status_code=401, content={"error": "Invalid admin key"}
                 )

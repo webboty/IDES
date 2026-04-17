@@ -27,6 +27,16 @@ import aiosqlite
 router = APIRouter()
 
 
+def _parse_skills(raw) -> list[str]:
+    if not raw or not isinstance(raw, str):
+        return []
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else []
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(400, "opencode_skills must be a valid JSON array, e.g. '[\"invoice_extraction\"]'")
+
+
 def _get_deps(request: Request) -> tuple[aiosqlite.Connection, FileStore, Any]:
     db = request.app.state.db
     file_store = request.app.state.file_store
@@ -79,10 +89,7 @@ async def extract_pdf(request: Request):
             agent_provider=form.get("agent_provider")
             if isinstance(form.get("agent_provider"), str)
             else None,
-            opencode_skills=json.loads(form["opencode_skills"])
-            if form.get("opencode_skills")
-            and isinstance(form.get("opencode_skills"), str)
-            else [],
+            opencode_skills=_parse_skills(form.get("opencode_skills")),
         )
 
     if not pdf_bytes:

@@ -88,6 +88,7 @@ async def _worker_loop(
         except asyncio.CancelledError:
             break
         except Exception as e:
+            print(f"[worker] unexpected error: {e}", flush=True)
             await asyncio.sleep(config.queue.worker_poll_interval)
 
 
@@ -106,9 +107,9 @@ async def _run_job_with_semaphore(
                 timeout=config.queue.job_timeout,
             )
         except asyncio.TimeoutError:
-            await update_job(job["id"], status="failed", last_error="Job timed out")
+            await update_job(db, job["id"], status="failed", last_error="Job timed out")
         except Exception as e:
-            await update_job(job["id"], status="failed", last_error=str(e))
+            await update_job(db, job["id"], status="failed", last_error=str(e)[:500])
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
