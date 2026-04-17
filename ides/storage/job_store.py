@@ -26,15 +26,19 @@ async def create_job(
     max_attempts: int = 3,
 ) -> dict:
     now = _now_iso()
+    job_date = now[:10]  # YYYY-MM-DD
     await db.execute(
-        """INSERT INTO jobs (id, status, original_filename, storage_path, options, max_attempts, created_at, updated_at)
-           VALUES (?, 'pending', ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO jobs
+               (id, status, original_filename, storage_path, options, max_attempts,
+                job_date, created_at, updated_at)
+           VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?)""",
         [
             job_id,
             filename,
             storage_path,
             json.dumps(options) if options else None,
             max_attempts,
+            job_date,
             now,
             now,
         ],
@@ -45,6 +49,7 @@ async def create_job(
         "status": "pending",
         "original_filename": filename,
         "storage_path": storage_path,
+        "job_date": job_date,
     }
 
 

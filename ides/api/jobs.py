@@ -103,12 +103,10 @@ async def extract_pdf(request: Request):
         )
 
     job_id = uuid.uuid4().hex[:24]
-    storage_path = f"jobs/{job_id}/"
-
-    file_store.create_job_dir(job_id)
-    file_store.save_original(job_id, pdf_bytes)
+    storage_path = file_store.create_job_dir(job_id)
+    file_store.save_original(storage_path, pdf_bytes)
     file_store.save_meta(
-        job_id,
+        storage_path,
         {
             "filename": filename,
             "options": options.model_dump(),
@@ -179,7 +177,7 @@ async def get_job_result(job_id: str, request: Request):
             metadata=MetadataInfo(),
         )
 
-    markdown = file_store.load_final_markdown(job_id) or ""
+    markdown = file_store.load_final_markdown(job["storage_path"]) or ""
     summary = json.loads(job.get("result_summary") or "{}")
 
     return JobResultResponse(
@@ -208,7 +206,7 @@ async def get_job_detail(job_id: str, request: Request):
     if job["status"] != "completed":
         return JobDetailResponse(job_id=job_id, status=job["status"])
 
-    detail = file_store.load_result_detail(job_id)
+    detail = file_store.load_result_detail(job["storage_path"])
     if not detail:
         return JobDetailResponse(job_id=job_id, status=job["status"])
 

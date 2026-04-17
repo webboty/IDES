@@ -60,7 +60,7 @@ async def run_pipeline(
         ExtractOptions(**json.loads(options_raw)) if options_raw else ExtractOptions()
     )
 
-    pdf_path = str(file_store.job_dir(job_id) / "original.pdf")
+    pdf_path = str(file_store.job_dir(storage_path) / "original.pdf")
     total_pages = get_page_count(pdf_path)
     page_range = parse_page_range(options.pages, total_pages)
 
@@ -100,7 +100,7 @@ async def run_pipeline(
                 pc.skipped = override.get("skipped", pc.skipped)
 
     class_data = [c.model_dump() for c in classifications]
-    file_store.save_classification(job_id, class_data)
+    file_store.save_classification(storage_path, class_data)
 
     model_config = {
         "provider": options.agent_provider or config.models.merge.provider,
@@ -163,7 +163,7 @@ async def run_pipeline(
                     "tables_found": len(tl.tables),
                 }
                 file_store.save_layer_result(
-                    job_id, pc.page_num, "text_layer", tl.model_dump()
+                    storage_path, pc.page_num, "text_layer", tl.model_dump()
                 )
                 layers_stats["text_layer"] = layers_stats.get("text_layer", 0) + 1
             except Exception as e:
@@ -178,7 +178,7 @@ async def run_pipeline(
                 )
                 layer_results["ocr"] = {"text": ocr.text}
                 file_store.save_layer_result(
-                    job_id, pc.page_num, "ocr", ocr.model_dump()
+                    storage_path, pc.page_num, "ocr", ocr.model_dump()
                 )
                 layers_stats["ocr"] = layers_stats.get("ocr", 0) + 1
             except Exception as e:
@@ -194,7 +194,7 @@ async def run_pipeline(
                 )
                 layer_results["vision"] = {"markdown": vis.markdown}
                 file_store.save_layer_result(
-                    job_id, pc.page_num, "vision", vis.markdown
+                    storage_path, pc.page_num, "vision", vis.markdown
                 )
                 layers_stats["vision"] = layers_stats.get("vision", 0) + 1
             except Exception as e:
@@ -202,11 +202,11 @@ async def run_pipeline(
                 layer_results["vision_error"] = str(e)
 
         try:
-            img_dir = file_store.get_page_images_dir(job_id, pc.page_num)
+            img_dir = file_store.get_page_images_dir(storage_path, pc.page_num)
             img_result = image_extractor.extract_images(pdf_path, pc.page_num, img_dir)
             if img_result.images:
                 file_store.save_layer_result(
-                    job_id, pc.page_num, "images", {"images": img_result.model_dump()}
+                    storage_path, pc.page_num, "images", {"images": img_result.model_dump()}
                 )
                 all_images.extend(
                     [{"page": pc.page_num, **img} for img in img_result.images]
@@ -226,7 +226,7 @@ async def run_pipeline(
         if not page_markdown.strip():
             page_markdown = _fallback_fuse(pc.classification, layer_results)
 
-        file_store.save_fusion_page(job_id, pc.page_num, page_markdown)
+        file_store.save_fusion_page(storage_path, pc.page_num, page_markdown)
 
         page_details.append(
             {
@@ -264,7 +264,7 @@ async def run_pipeline(
         },
     }
 
-    file_store.save_final_result(job_id, final_markdown, detail)
+    file_store.save_final_result(storage_path, final_markdown, detail)
     return detail
 
 

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     progress_total INTEGER DEFAULT 0,
     pages_skipped INTEGER DEFAULT 0,
     layers_stats TEXT,
+    job_date TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -50,12 +51,23 @@ CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at);
 DB_PATH: str = "data/ides.db"
 
 
+async def _migrate(db: aiosqlite.Connection) -> None:
+    cursor = await db.execute("PRAGMA table_info(jobs)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    if "job_date" not in cols:
+        await db.execute("ALTER TABLE jobs ADD COLUMN job_date TEXT")
+        await db.execute(
+            "UPDATE jobs SET job_date = date(created_at) WHERE job_date IS NULL"
+        )
+
+
 async def init_database(db_path: str = DB_PATH) -> aiosqlite.Connection:
     db_dir = Path(db_path).parent
     db_dir.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(db_path)
     db.row_factory = aiosqlite.Row
     await db.executescript(SCHEMA)
+    await _migrate(db)
     await db.commit()
     return db
 
