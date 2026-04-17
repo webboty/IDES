@@ -40,17 +40,23 @@ The result: high accuracy at a fraction of the cost of "send everything to GPT-4
 flowchart TD
     Client["Client\n(n8n / curl / API)"]
 
-    Client -->|"POST /extract\nGET /jobs/…\nGET /health\n— every request —"| IPCheck
+    Client -->|"— every request —"| IPCheck
 
-    subgraph Security["Security Middleware — every request passes through both checks"]
-        IPCheck{"① IP Allowlist\nserver.allowed_ips"}
-        AuthCheck{"② Key Check\nAPI Key or Admin Key"}
-        IPCheck -->|"IP listed\n(allowlist empty = everyone)"| AuthCheck
+    subgraph Security["① IP Allowlist — every request"]
+        IPCheck{"server.allowed_ips\nIP listed?\n(empty = everyone)"}
     end
 
     IPCheck -->|"IP not listed → 403"| Denied["Request denied"]
-    AuthCheck -->|"invalid → 401"| Denied
-    AuthCheck -->|valid| API["FastAPI\nHTTP Layer"]
+    IPCheck -->|"IP allowed"| Router{"Path?"}
+
+    Router -->|"/health\n/health/llm"| API
+    Router -->|"/admin/*"| AdminCheck{"Admin Key\nX-Admin-Key"}
+    Router -->|"/extract\n/jobs/*"| APICheck{"API Key\nX-API-Key"}
+
+    AdminCheck -->|"invalid → 401"| Denied
+    AdminCheck -->|valid| API["FastAPI\nHTTP Layer"]
+    APICheck -->|"invalid → 401"| Denied
+    APICheck -->|valid| API
 
     API -->|"job_id · status · markdown"| Client
     API -->|create job| DB[(SQLite)]
@@ -82,8 +88,9 @@ flowchart TD
     FA -.->|fallback| OAI
 ```
 
-> **Every request — without exception — passes through both checks in order.**
-> The IP allowlist is opt-in: leave `server.allowed_ips` empty (the default) to allow all IPs, or populate it to lock the entire service down to specific addresses before any key validation even runs.
+> **Every request passes through the IP allowlist first** — no exceptions.
+> After that, `/health` endpoints are public (no key needed), `/admin/*` requires the admin key, and `/extract` + `/jobs/*` require an API key.
+> The IP allowlist is opt-in: leave `server.allowed_ips` empty (the default) to allow all IPs, or populate it to restrict the entire service to specific addresses.
 
 ---
 
