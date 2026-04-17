@@ -40,14 +40,21 @@ The result: high accuracy at a fraction of the cost of "send everything to GPT-4
 flowchart TD
     Client["Client\n(n8n / curl / API)"]
 
-    Client -->|"every request"| IPCheck{"① IP Allowlist\nserver.allowed_ips\napplied to ALL traffic"}
+    Client -->|"POST /extract\nGET /jobs/…\nGET /health\n— every request —"| IPCheck
+
+    subgraph Security["Security Middleware — every request passes through both checks"]
+        IPCheck{"① IP Allowlist\nserver.allowed_ips"}
+        AuthCheck{"② Key Check\nAPI Key or Admin Key"}
+        IPCheck -->|"IP listed\n(allowlist empty = everyone)"| AuthCheck
+    end
+
     IPCheck -->|"IP not listed → 403"| Denied["Request denied"]
-    IPCheck -->|"IP listed\n(allowlist empty = everyone passes)"| AuthCheck{"② Key Check\nAPI Key or Admin Key"}
     AuthCheck -->|"invalid → 401"| Denied
     AuthCheck -->|valid| API["FastAPI\nHTTP Layer"]
 
-    API -->|"job_id (pending)"| Client
+    API -->|"job_id · status · markdown"| Client
     API -->|create job| DB[(SQLite)]
+    FS -->|result data| API
 
     Worker["Async Worker\n(runs inside uvicorn)"] -->|poll every 2 s| DB
     DB -->|pending job| Worker
@@ -65,11 +72,6 @@ flowchart TD
 
     FA -->|save final.md| FS[("File Store\n/data/jobs/YYYY/MM/DD/{id}/")]
     FA -->|status = completed| DB
-
-    Client -->|"GET /jobs/{id}"| API
-    API -->|status · progress| Client
-    Client -->|"GET /jobs/{id}/result"| API
-    API --> FS
 
     subgraph LLM Backends
         Local["Local LLM\n(via Tailscale VPN)"]
