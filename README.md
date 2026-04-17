@@ -1,22 +1,39 @@
 # IDES — Intelligent Document Extraction System
 
-> Async PDF-to-Markdown extraction service with adaptive multi-layer pipeline.
-> Built for integration with n8n, automation platforms, and direct API consumption.
+**PDFs shouldn't hold your data hostage.**
+
+Every day, invoices, offers, and contracts arrive as PDFs. The numbers you need are in there — buried in scanned images, multi-column layouts, and 12-page appendices of boilerplate nobody asked for. Copying them by hand doesn't scale. Generic extraction tools guess, hallucinate, or silently drop rows. You end up building validation logic on top of unreliable output, and still fixing mistakes manually.
+
+IDES takes a different approach. It reads PDFs the way a meticulous accountant would — using every available source, cross-checking every number, and skipping the pages that don't matter. The result is clean, structured Markdown you can actually trust.
 
 ---
 
-## Documentation
+## Why IDES
 
-| Document | Description |
-|---|---|
-| [DEPLOY.md](DEPLOY.md) | Full server deployment guide (Ubuntu 22.04/24.04, nginx, systemd) |
-| [CLI.md](CLI.md) | CLI command reference — manage keys, jobs, and the server |
+Most extraction tools pick one strategy: OCR everything, or send every page to a vision model. Both are expensive and error-prone. IDES uses an **adaptive, cheapest-first pipeline**:
+
+- Pages with a clean digital text layer? Read them directly — **free, instant, perfect fidelity.**
+- Scanned pages? OCR with Tesseract — **free, fast, no API call.**
+- Complex layouts where structure matters? Vision LLM — **only when nothing else is enough.**
+- Every number on every page is **cross-validated across all sources** before it's written to output. If pdfplumber, OCR, and the vision model all agree on `€ 12.450,00` — it goes in. If they disagree, the fusion agent picks the most reliable source and uses that.
+- Boilerplate (AGB, Impressum, privacy policies) is **detected and skipped** automatically — no LLM tokens wasted on pages you don't need.
+
+The result: high accuracy at a fraction of the cost of "send everything to GPT-4o."
+
+---
+
+## What You Get
+
+- **A production-ready API service** — submit a PDF, get a `job_id`, poll for results. Works out of the box with n8n, Make, Zapier, or any HTTP client.
+- **Structured Markdown output** — tables preserved, numbers exact, language unchanged.
+- **Per-page breakdown** — see exactly which layers ran, what was skipped, and why.
+- **Full management CLI** — create API keys, inspect jobs, check server health, clean up old files — all without touching the database directly.
+- **Self-hosted, no lock-in** — runs on any VPS. Use your own local LLM via Tailscale, fall back to OpenAI, or mix both.
+- **Configurable everything** — file size limits, page limits, concurrency, timeouts, boilerplate patterns, DPI settings — all in one YAML file.
 
 ---
 
 ## How It Works
-
-IDES takes a PDF (invoice, offer, contract, any business document) and returns structured Markdown using a **cheapest-first** adaptive pipeline.
 
 ```mermaid
 flowchart TD
@@ -29,7 +46,7 @@ flowchart TD
     Worker["Async Worker\n(runs inside uvicorn)"] -->|poll every 2 s| DB
     DB -->|pending job| Worker
 
-    Worker --> PF["Pre-Filter\npdfplumber — cheap scan of all pages"]
+    Worker --> PF["Pre-Filter\npdfplumber — fast scan of all pages"]
 
     PF -->|boilerplate page\nAGB · privacy · impressum| SKIP["SKIP\n(not extracted)"]
 
@@ -37,7 +54,7 @@ flowchart TD
     PF -->|scanned page| OV["OCR + Vision LLM"]
     PF -->|mixed page| ALL["Text Layer + OCR + Vision LLM"]
 
-    TL --> FA["Fusion Agent\nLLM — cross-validates numbers,\nmerges all sources"]
+    TL --> FA["Fusion Agent\nLLM — cross-validates numbers,\nmerges all sources → clean Markdown"]
     OV --> FA
     ALL --> FA
 
@@ -58,44 +75,11 @@ flowchart TD
     FA -.->|fallback| OAI
 ```
 
-**Extraction layers — cheapest first:**
-
-| Layer | Tool | When used |
-|---|---|---|
-| Text layer | pdfplumber | Digital-text pages (free, instant) |
-| OCR | Tesseract | Scanned pages (free, ~1 s/page) |
-| Vision LLM | GPT / local model | Image-heavy / mixed pages |
-| Fusion agent | LLM | Every non-skipped page — merges + validates numbers |
-
-Boilerplate pages (AGB, Impressum, privacy policy) are detected by regex and optionally confirmed by LLM, then skipped entirely.
-
----
-
-## Features
-
-- **Async job queue** — submit a PDF, get a `job_id`, poll for results
-- **Multi-layer extraction** — text layer, OCR, vision LLM, embedded image descriptions
-- **Number cross-validation** — fusion agent compares all sources before emitting any number
-- **Boilerplate detection** — regex-first, LLM-confirm, cascade skip
-- **Date-based file storage** — `jobs/YYYY/MM/DD/{job_id}/` for easy navigation
-- **API key security** — per-user keys with optional IP restriction, SHA-256 stored
-- **Configurable limits** — max file size, max pages, concurrency, timeouts, all in `config.yaml`
-- **Retry + agent recovery** — up to 3 attempts; on final attempt the agent analyses the failure and adjusts
-- **Dual LLM backend** — local model via Tailscale VPN + OpenAI cloud fallback
-- **Management CLI** — `ides keys create`, `ides jobs list`, `ides status`, and more (see [CLI.md](CLI.md))
-
 ---
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.11+
-- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) with language packs (`deu`, `eng`, `rus`)
-- [Poppler](https://poppler.freedesktop.org/) (`pdf2image` dependency)
-- (Optional) Local LLM server ([Ollama](https://ollama.com)) reachable over Tailscale VPN
-
-### Install
+### 1. Install
 
 ```bash
 git clone https://github.com/webboty/IDES.git
@@ -106,105 +90,78 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-**macOS system deps:**
+**macOS:**
 ```bash
 brew install tesseract tesseract-lang poppler
 ```
 
-**Ubuntu system deps:**
+**Ubuntu / Debian:**
 ```bash
 apt install -y tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng tesseract-ocr-rus \
                poppler-utils libgl1
 ```
 
-### Configure
+### 2. Configure
 
 ```bash
-# Required environment variables
-export IDES_ADMIN_KEY="your-secret-admin-key"
-export OPENAI_API_KEY="sk-..."     # only if using OpenAI provider
+export IDES_ADMIN_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+export OPENAI_API_KEY="sk-..."
 ```
 
-Edit `config.yaml` to set your LLM endpoints, storage path, and limits. Key settings:
+Edit `config.yaml` for your LLM endpoints, storage path, and limits.
 
-```yaml
-storage:
-  base_path: "./data"
-
-extraction:
-  max_file_size_mb: 50
-  max_pages: 50
-```
-
-### Run
+### 3. Start
 
 ```bash
-# Development (recommended)
 ides serve
-
-# Or directly via uvicorn
-uvicorn ides.main:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-> **Important:** always use `--workers 1`. Multiple workers each start their own job polling loop and would process the same jobs twice.
-
-### Create your first API key
+### 4. Create an API key
 
 ```bash
-# Via CLI (server does not need to be running)
 ides keys create --name my-key --owner me
-
-# Or via the HTTP admin API
-curl -X POST http://localhost:8000/admin/keys \
-  -H "X-Admin-Key: your-secret-admin-key" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-key", "owner": "me"}'
+# Key is printed once — save it.
 ```
 
-Save the returned key (starts with `ides_`) — it is shown **only once**.
-
-### Extract a PDF
+### 5. Extract a PDF
 
 ```bash
 curl -X POST http://localhost:8000/extract \
-  -H "X-API-Key: ides_your-key-here" \
-  -F "file=@invoice.pdf" \
-  -F "pages=all" \
-  -F "skip_boilerplate=true"
-# Response: {"job_id": "abc123...", "status": "pending"}
+  -H "X-API-Key: ides_..." \
+  -F "file=@invoice.pdf"
+# {"job_id": "abc123...", "status": "pending"}
 
-# Poll status
 curl http://localhost:8000/jobs/abc123... \
-  -H "X-API-Key: ides_your-key-here"
+  -H "X-API-Key: ides_..."
+# {"status": "completed", ...}
 
-# Get result
 curl http://localhost:8000/jobs/abc123.../result \
-  -H "X-API-Key: ides_your-key-here"
+  -H "X-API-Key: ides_..."
+# {"markdown": "# Invoice\n\n| Item | ..."}
 ```
 
 ---
 
-## CLI Overview
+## CLI
 
-The `ides` command is installed automatically with the package. See [CLI.md](CLI.md) for the full reference.
+The `ides` command is installed with the package. See **[CLI.md](CLI.md)** for the full reference.
 
 ```
 ides serve                     Start the API server
-ides status                    Server state, worker activity, queue depth, disk usage
-ides llm [--test]              Show LLM config; --test checks live connectivity
+ides status                    Server state, worker, queue depth, disk usage
 
-ides keys create               Create a new API key (printed once — save it)
-ides keys list                 List all active API keys
-ides keys revoke <id>          Revoke an API key
+ides keys create               Create a new API key
+ides keys list                 List all active keys
+ides keys revoke <id>          Revoke a key immediately
 
 ides jobs list                 List jobs — filter by --date and/or --status
-ides jobs stats                Daily job statistics for the last N days
+ides jobs stats                Daily statistics for the last N days
 ides jobs cancel <id>          Cancel a pending/retrying job
 ides jobs purge <id>           Delete job files and DB row permanently
 ides jobs cleanup              Delete old job files (keeps DB records)
 
-ides restart                   Restart the IDES systemd service
-ides stop                      Stop the IDES systemd service
+ides llm [--test]              Show LLM config; --test checks live connectivity
+ides restart / stop            Manage the systemd service
 ```
 
 ---
@@ -213,32 +170,18 @@ ides stop                      Stop the IDES systemd service
 
 | Endpoint | Method | Auth | Description |
 |---|---|---|---|
-| `/extract` | POST | API Key | Submit PDF for extraction |
-| `/jobs/{id}` | GET | API Key | Job status and progress |
-| `/jobs/{id}/result` | GET | API Key | Final Markdown output |
-| `/jobs/{id}/detail` | GET | API Key | Full per-page breakdown |
-| `/admin/keys` | POST | Admin Key | Create new API key |
+| `/extract` | POST | API Key | Submit PDF (multipart or base64 JSON) |
+| `/jobs/{id}` | GET | API Key | Job status and per-page progress |
+| `/jobs/{id}/result` | GET | API Key | Final Markdown + metadata |
+| `/jobs/{id}/detail` | GET | API Key | Full per-page breakdown with layer stats |
+| `/admin/keys` | POST | Admin Key | Create API key |
 | `/admin/keys` | GET | Admin Key | List all API keys |
-| `/admin/keys/{id}` | DELETE | Admin Key | Deactivate an API key |
-| `/health` | GET | None | Health check |
-| `/health/llm` | GET | None | LLM provider status |
-
-**POST /extract** accepts both multipart form-data (file upload) and `application/json` (base64):
-
-```json
-{
-  "file_base64": "JVBERi0...",
-  "filename": "invoice.pdf",
-  "pages": "all",
-  "skip_boilerplate": true,
-  "agent_model": null,
-  "agent_provider": null,
-  "opencode_skills": []
-}
-```
+| `/admin/keys/{id}` | DELETE | Admin Key | Deactivate a key |
+| `/health` | GET | None | Liveness check |
+| `/health/llm` | GET | None | LLM provider connectivity status |
 
 **Job statuses:** `pending` → `processing` → `completed` / `failed`
-Retries cycle through: `retrying` (attempt 2), `recovering` (attempt 3, agent-guided).
+On failure: retries as `retrying` (attempt 2), then `recovering` (attempt 3, agent-guided), then `failed`.
 
 ---
 
@@ -247,21 +190,31 @@ Retries cycle through: `retrying` (attempt 2), `recovering` (attempt 3, agent-gu
 In an n8n **HTTP Request** node:
 
 ```
-Method: POST
-URL:    https://your-domain.com/extract
-Authentication: Header Auth  (Header: X-API-Key, Value: ides_...)
-Body:   Multipart/Form-Data
-  file               → binary from previous node
-  pages              → "all"
-  skip_boilerplate   → "true"
+Method:  POST
+URL:     https://your-domain.com/extract
+Auth:    Header Auth — X-API-Key: ides_...
+Body:    Multipart/Form-Data
+  file             → binary from previous node
+  pages            → "all"
+  skip_boilerplate → "true"
 ```
 
 **Polling workflow:**
 1. `POST /extract` → save `job_id`
 2. Wait 10 s
 3. `GET /jobs/{job_id}` → check `status`
-4. If not `completed` → wait 5 s → repeat
+4. Not `completed` yet? Wait 5 s → repeat
 5. `GET /jobs/{job_id}/result` → get `markdown`
+
+---
+
+## Documentation
+
+| | |
+|---|---|
+| [DEPLOY.md](DEPLOY.md) | Step-by-step server setup — Ubuntu, nginx, systemd, Tailscale, Let's Encrypt |
+| [CLI.md](CLI.md) | Full CLI reference — every command, flag, and common workflow |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How IDES is built — pipeline design, database schema, security model, scaling path |
 
 ---
 
@@ -270,7 +223,7 @@ Body:   Multipart/Form-Data
 ```
 IDES/
 ├── ides/
-│   ├── main.py              # FastAPI app + embedded worker
+│   ├── main.py              # FastAPI app + embedded async worker
 │   ├── cli.py               # Management CLI (ides serve / keys / jobs / status …)
 │   ├── config.py            # YAML + env var config (Pydantic Settings)
 │   ├── models.py            # Pydantic request/response schemas
@@ -283,25 +236,28 @@ IDES/
 │   │   ├── prefilter.py     # Classify all pages (cheap pass)
 │   │   └── page_plan.py     # Per-page layer selection
 │   ├── extractors/
-│   │   ├── text_layer.py    # pdfplumber: text + tables
+│   │   ├── text_layer.py    # pdfplumber — text + tables
 │   │   ├── ocr.py           # Tesseract with image preprocessing
-│   │   ├── vision.py        # Vision LLM: image → markdown
+│   │   ├── vision.py        # Vision LLM — image → Markdown
 │   │   └── images.py        # Embedded image extraction + description
 │   ├── fusion/
 │   │   ├── rules.py         # Programmatic merge rules
 │   │   └── llm_merge.py     # LLM fusion agent
+│   ├── agent/
+│   │   └── brain.py         # FusionAgent + recovery analysis
 │   ├── llm/
 │   │   ├── client.py        # Async OpenAI-compatible client
 │   │   └── prompts.py       # Default prompt templates
 │   └── storage/
-│       ├── database.py      # SQLite schema + migrations
+│       ├── database.py      # SQLite schema + startup migrations
 │       ├── job_store.py     # Job + API key CRUD
 │       └── file_store.py    # Date-based file layout
 ├── tests/                   # 119 tests
-├── config.yaml              # Configuration file
-├── pyproject.toml           # Dependencies + entry points
-├── DEPLOY.md                # Production deployment guide
-└── CLI.md                   # CLI command reference
+├── config.yaml
+├── pyproject.toml
+├── DEPLOY.md
+├── CLI.md
+└── ARCHITECTURE.md
 ```
 
 ---
