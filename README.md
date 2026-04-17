@@ -40,43 +40,30 @@ The result: high accuracy at a fraction of the cost of "send everything to GPT-4
 flowchart TD
     Client["Client\n(n8n / curl / API)"]
 
-    Client -->|"— every request —"| IPCheck
-
-    subgraph Security["① IP Allowlist — every request"]
-        IPCheck{"server.allowed_ips\nIP listed?\n(empty = everyone)"}
-    end
-
-    IPCheck -->|"IP not listed → 403"| Denied["Request denied"]
-    IPCheck -->|"IP allowed"| Router{"Path?"}
-
-    Router -->|"/health\n/health/llm"| API
-    Router -->|"/admin/*"| AdminCheck{"Admin Key\nX-Admin-Key"}
-    Router -->|"/extract\n/jobs/*"| APICheck{"API Key\nX-API-Key"}
-
-    AdminCheck -->|"invalid → 401"| Denied
-    AdminCheck -->|valid| API["FastAPI\nHTTP Layer"]
-    APICheck -->|"invalid → 401"| Denied
-    APICheck -->|valid| API
+    Client -->|every request| IP{"① IP Allowlist\nserver.allowed_ips\n─────────────\nempty = allow all\nnon-empty = listed IPs only"}
+    IP -->|IP not listed → 403| Denied["Request Denied"]
+    IP -->|IP allowed| Auth{"② Endpoint Auth\n─────────────\n/health → public, no key\n/admin/* → X-Admin-Key\n/extract, /jobs/* → X-API-Key"}
+    Auth -->|invalid key → 401| Denied
+    Auth -->|valid| API["FastAPI\nHTTP Layer"]
 
     API -->|"job_id · status · markdown"| Client
     API -->|create job| DB[(SQLite)]
-    FS -->|result data| API
+    FS -->|result| API
 
     Worker["Async Worker\n(runs inside uvicorn)"] -->|poll every 2 s| DB
     DB -->|pending job| Worker
 
-    Worker --> PF["Pre-Filter\npdfplumber — fast scan of all pages"]
-
-    PF -->|boilerplate page\nAGB · privacy · impressum| SKIP["SKIP\n(not extracted)"]
+    Worker --> PF["Pre-Filter\npdfplumber — classify all pages"]
+    PF -->|boilerplate page| SKIP["SKIP"]
     PF -->|text-rich page| TL["Text Layer\npdfplumber"]
     PF -->|scanned page| OV["OCR + Vision LLM"]
-    PF -->|mixed page| ALL["Text Layer + OCR + Vision LLM"]
+    PF -->|mixed page| ALL["Text + OCR + Vision LLM"]
 
-    TL --> FA["Fusion Agent\nLLM — cross-validates numbers,\nmerges all sources → clean Markdown"]
+    TL --> FA["Fusion Agent\nLLM — cross-validates numbers\nmerges all sources → Markdown"]
     OV --> FA
     ALL --> FA
 
-    FA -->|save final.md| FS[("File Store\n/data/jobs/YYYY/MM/DD/{id}/")]
+    FA -->|save result| FS[("File Store\n/data/jobs/YYYY/MM/DD/{id}/")]
     FA -->|status = completed| DB
 
     subgraph LLM Backends
