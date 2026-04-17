@@ -8,7 +8,7 @@ storage:
 
 providers:
   local:
-    base_url: "http://192.168.1.141:11435/v1"
+    base_url: "http://192.168.1.107:11435/v1"
     api_key: "not-needed"
     timeout: 180
   openai:
@@ -60,5 +60,5 @@ retry:
 
 queue:
   max_concurrent_jobs: 2
-  job_timeout: 600
+  job_timeout: 3600
   worker_poll_interval: 2

@@ -110,8 +110,28 @@ class AppConfig(BaseSettings):
     model_config = {"extra": "ignore"}
 
 
+def _load_dotenv():
+    dotenv_path = Path(".env")
+    if not dotenv_path.exists():
+        return
+    for line in dotenv_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
     config_path = Path(config_path)
+
+    _load_dotenv()
+
     if config_path.exists():
         with open(config_path) as f:
             raw = yaml.safe_load(f)

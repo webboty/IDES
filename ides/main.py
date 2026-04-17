@@ -37,6 +37,17 @@ async def lifespan(app: FastAPI):
         {name: p.model_dump() for name, p in config.providers.items()}
     )
 
+    llm_results = await app.state.llm_client.check_all()
+    for r in llm_results:
+        status = r["status"]
+        name = r["provider"]
+        if status == "ok":
+            print(f"  LLM provider '{name}': OK")
+        else:
+            print(
+                f"  LLM provider '{name}': {status} (extraction will use text_layer + OCR only)"
+            )
+
     worker_task = asyncio.create_task(
         _worker_loop(_db, config, app.state.file_store, app.state.llm_client)
     )
@@ -117,9 +128,20 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     async def health():
         return {"status": "ok"}
 
+    @app.get("/health/llm")
+    async def health_llm():
+        llm: LLMClient | None = getattr(app.state, "llm_client", None)
+        if not llm:
+            return {"providers": [], "note": "LLM client not initialized"}
+        results = await llm.check_all()
+        return {"providers": results}
+
     app.router.lifespan_context = lifespan
 
     return app
+
+
+app = create_app()
 
 
 def cli():

@@ -28,6 +28,23 @@ from ides.utils.pdf_ops import get_page_count, parse_page_range, split_pdf_to_pa
 import aiosqlite
 
 
+def _fallback_fuse(classification: str, layer_results: dict[str, Any]) -> str:
+    if classification == "boilerplate":
+        return ""
+    tl = layer_results.get("text_layer")
+    if tl and isinstance(tl, dict) and tl.get("markdown"):
+        return tl["markdown"]
+    ocr = layer_results.get("ocr")
+    if ocr and isinstance(ocr, dict) and ocr.get("text"):
+        return ocr["text"]
+    vis = layer_results.get("vision")
+    if vis and isinstance(vis, dict) and vis.get("markdown"):
+        return vis["markdown"]
+    if tl and isinstance(tl, dict) and tl.get("text"):
+        return tl["text"]
+    return ""
+
+
 async def run_pipeline(
     job: dict,
     config: AppConfig,
@@ -59,8 +76,15 @@ async def run_pipeline(
         llm_client, min_image_size=config.thresholds.min_image_size
     )
 
+    vision_provider = config.models.vision.provider
+    merge_provider = options.agent_provider or config.models.merge.provider
+    vision_ok = llm_client.is_available(vision_provider)
+    merge_ok = llm_client.is_available(merge_provider)
+
+    effective_llm_client = llm_client if merge_ok else None
+
     classifications = await classify_all_pages(
-        pdf_path, config, ocr_extractor, llm_client
+        pdf_path, config, ocr_extractor, effective_llm_client
     )
     classifications = [c for c in classifications if c.page_num in page_range]
 
@@ -90,10 +114,14 @@ async def run_pipeline(
         "max_tokens": config.models.image_describe.max_tokens,
     }
 
-    fusion_agent = FusionAgent(
-        llm_client,
-        model_config,
-        system_prompt=options.merge_prompt,
+    fusion_agent = (
+        FusionAgent(
+            llm_client,
+            model_config,
+            system_prompt=options.merge_prompt,
+        )
+        if merge_ok
+        else None
     )
 
     pages_skipped = 0
@@ -152,7 +180,7 @@ async def run_pipeline(
             except Exception as e:
                 layer_results["ocr_error"] = str(e)
 
-        if "vision" in pc.layers_needed:
+        if "vision" in pc.layers_needed and vision_ok:
             try:
                 vis = await vision_extractor.extract(
                     pdf_path,
@@ -181,9 +209,14 @@ async def run_pipeline(
         except Exception:
             pass
 
-        page_markdown = await fuse_page(
-            pc.classification, layer_results, fusion_agent, pc.page_num
-        )
+        page_markdown = ""
+        try:
+            page_markdown = await fuse_page(
+                pc.classification, layer_results, fusion_agent, pc.page_num
+            )
+        except Exception:
+            page_markdown = _fallback_fuse(pc.classification, layer_results)
+
         file_store.save_fusion_page(job_id, pc.page_num, page_markdown)
 
         page_details.append(
