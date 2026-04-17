@@ -28,6 +28,7 @@ The result: high accuracy at a fraction of the cost of "send everything to GPT-4
 - **Structured Markdown output** — tables preserved, numbers exact, language unchanged.
 - **Per-page breakdown** — see exactly which layers ran, what was skipped, and why.
 - **Full management CLI** — create API keys, inspect jobs, check server health, clean up old files — all without touching the database directly.
+- **Two-layer IP security** — a global service allowlist in `config.yaml` (blocks everything from unlisted IPs before any key check) plus optional per-key IP restrictions for individual callers.
 - **Self-hosted, no lock-in** — runs on any VPS. Use your own local LLM via Tailscale, fall back to OpenAI, or mix both.
 - **Configurable everything** — file size limits, page limits, concurrency, timeouts, boilerplate patterns, DPI settings — all in one YAML file.
 
@@ -39,9 +40,14 @@ The result: high accuracy at a fraction of the cost of "send everything to GPT-4
 flowchart TD
     Client["Client\n(n8n / curl / API)"]
 
-    Client -->|"POST /extract (PDF)"| API["FastAPI\nHTTP Layer"]
-    API -->|"201 job_id pending"| Client
-    API -->|create job record| DB[(SQLite)]
+    Client -->|any request| IPCheck{"① Global IP\nAllowlist\nserver.allowed_ips"}
+    IPCheck -->|"IP not listed → 403"| Denied["Request denied"]
+    IPCheck -->|"IP allowed\nor no list set"| AuthCheck{"② API Key\nor Admin Key"}
+    AuthCheck -->|"invalid → 401"| Denied
+    AuthCheck -->|valid| API["FastAPI\nHTTP Layer"]
+
+    API -->|"job_id (pending)"| Client
+    API -->|create job| DB[(SQLite)]
 
     Worker["Async Worker\n(runs inside uvicorn)"] -->|poll every 2 s| DB
     DB -->|pending job| Worker
@@ -49,7 +55,6 @@ flowchart TD
     Worker --> PF["Pre-Filter\npdfplumber — fast scan of all pages"]
 
     PF -->|boilerplate page\nAGB · privacy · impressum| SKIP["SKIP\n(not extracted)"]
-
     PF -->|text-rich page| TL["Text Layer\npdfplumber"]
     PF -->|scanned page| OV["OCR + Vision LLM"]
     PF -->|mixed page| ALL["Text Layer + OCR + Vision LLM"]
@@ -227,7 +232,7 @@ IDES/
 │   ├── cli.py               # Management CLI (ides serve / keys / jobs / status …)
 │   ├── config.py            # YAML + env var config (Pydantic Settings)
 │   ├── models.py            # Pydantic request/response schemas
-│   ├── security.py          # Auth middleware (API keys + admin key)
+│   ├── security.py          # Auth middleware (global IP allowlist + API/admin key)
 │   ├── api/
 │   │   ├── jobs.py          # POST /extract, GET /jobs/*
 │   │   └── admin.py         # POST/GET/DELETE /admin/keys
@@ -252,7 +257,7 @@ IDES/
 │       ├── database.py      # SQLite schema + startup migrations
 │       ├── job_store.py     # Job + API key CRUD
 │       └── file_store.py    # Date-based file layout
-├── tests/                   # 119 tests
+├── tests/                   # 122 tests
 ├── config.yaml
 ├── pyproject.toml
 ├── DEPLOY.md
