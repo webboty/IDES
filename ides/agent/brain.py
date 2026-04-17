@@ -43,6 +43,9 @@ def validate_numbers(sources: dict[str, str]) -> dict[str, dict]:
             confidence = "high"
         elif "ocr" in info["sources"]:
             recommended = info["sources"]["ocr"]
+            num_sources = len(info["sources"])
+            if num_sources == 1:
+                confidence = "medium"
         else:
             recommended = source_values[0]
             confidence = "low"

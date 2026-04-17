@@ -25,10 +25,6 @@ import aiosqlite
 _db: aiosqlite.Connection | None = None
 
 
-def _get_db() -> aiosqlite.Connection | None:
-    return _db
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _db
@@ -112,7 +108,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app = FastAPI(title="IDES", version="0.1.0")
     app.state.config = config
 
-    create_auth_middleware(app, config, _get_db)
+    create_auth_middleware(app, config)
 
     app.include_router(jobs_router)
     app.include_router(admin_router)

@@ -43,7 +43,7 @@ extraction:
   skip_boilerplate: true
   boilerplate_patterns:
     - "(?i)allgemeine.{0,5}geschäft"
-    - "(?i)terms.{0,5}(and|&)conditions"
+    - "(?i)terms.{0,10}conditions"
     - "(?i)datenschutz"
     - "(?i)impressum"
     - "(?i)privacy.{0,5}policy"

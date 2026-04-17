@@ -39,7 +39,15 @@ class ExtractionConfig(BaseModel):
     ocr_languages: str = "deu+eng+rus"
     max_pages: int = 50
     skip_boilerplate: bool = True
-    boilerplate_patterns: list[str] = Field(default_factory=list)
+    boilerplate_patterns: list[str] = Field(
+        default_factory=lambda: [
+            "(?i)allgemeine.{0,5}geschäft",
+            "(?i)terms.{0,10}conditions",
+            "(?i)datenschutz",
+            "(?i)impressum",
+            "(?i)privacy.{0,5}policy",
+        ]
+    )
 
 
 class ThresholdConfig(BaseModel):

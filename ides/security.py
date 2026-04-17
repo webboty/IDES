@@ -53,7 +53,7 @@ async def verify_api_key(api_key: str, client_ip: str, db: Any) -> dict | None:
     return record
 
 
-def create_auth_middleware(app: Any, config: AppConfig, get_db: Any):
+def create_auth_middleware(app: Any, config: AppConfig):
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next: Any):
         path = request.url.path
@@ -69,7 +69,7 @@ def create_auth_middleware(app: Any, config: AppConfig, get_db: Any):
         if path == "/extract" or path.startswith("/jobs"):
             api_key = request.headers.get("X-API-Key")
             client_ip = request.client.host if request.client else "unknown"
-            db = get_db()
+            db = getattr(request.app.state, "db", None)
             if db is None:
                 return JSONResponse(
                     status_code=503, content={"error": "Service unavailable"}
