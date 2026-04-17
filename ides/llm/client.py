@@ -62,7 +62,7 @@ class LLMClient:
                 client.chat.completions.create(
                     model=model_config["name"],
                     messages=messages,
-                    max_tokens=model_config.get("max_tokens", 4000),
+                    max_completion_tokens=model_config.get("max_tokens", 4000),
                     **kwargs,
                 ),
                 timeout=timeout,

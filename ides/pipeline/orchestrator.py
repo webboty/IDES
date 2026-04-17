@@ -81,6 +81,10 @@ async def run_pipeline(
     vision_ok = llm_client.is_available(vision_provider)
     merge_ok = llm_client.is_available(merge_provider)
 
+    print(
+        f"  [pipeline] vision_ok={vision_ok} ({vision_provider}), merge_ok={merge_ok} ({merge_provider})"
+    )
+
     effective_llm_client = llm_client if merge_ok else None
 
     classifications = await classify_all_pages(
@@ -194,6 +198,7 @@ async def run_pipeline(
                 )
                 layers_stats["vision"] = layers_stats.get("vision", 0) + 1
             except Exception as e:
+                print(f"  [pipeline] vision error page {pc.page_num}: {e}")
                 layer_results["vision_error"] = str(e)
 
         try:
@@ -214,7 +219,8 @@ async def run_pipeline(
             page_markdown = await fuse_page(
                 pc.classification, layer_results, fusion_agent, pc.page_num
             )
-        except Exception:
+        except Exception as e:
+            print(f"  [pipeline] fusion error page {pc.page_num}: {e}")
             page_markdown = ""
 
         if not page_markdown.strip():

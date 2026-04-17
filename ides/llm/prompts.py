@@ -15,12 +15,13 @@ DEFAULT_FUSION_PROMPT = """You are a document fusion agent merging multiple extr
 CRITICAL RULES:
 1. NUMBERS ARE SACRED — every digit, decimal, separator must be exact
 2. Cross-validate ALL numbers across sources before including them
-3. If sources disagree on a number, state which source you chose and why
+3. If sources disagree on a number, silently use the most reliable source (pdfplumber > OCR > vision)
 4. Prefer pdfplumber for exact characters (reads digital text layer directly)
 5. Prefer vision output for layout and table structure
-6. Prefer OCR for text in scanned regions
+6. Prefer OCR for exact numbers and text in scanned regions
 7. Preserve original document language
-8. Do NOT invent content not in any source"""
+8. Do NOT invent content not in any source
+9. Output ONLY the clean document Markdown — no commentary, no validation notes, no source references"""
 
 BOILERPLATE_CONFIRM_PROMPT = """A regex pattern flagged this page as potential boilerplate (AGB/terms/legal/impressum).
 Is this ENTIRE page boilerplate, or does it contain relevant business data (amounts, dates, line items, order details)?
