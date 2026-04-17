@@ -56,19 +56,27 @@ async def classify_all_pages(
                     if len(ocr_text.strip()) < 10:
                         pc.classification = "image_only"
                         pc.layers_needed = get_layers_for_classification("image_only")
+                    elif is_boilerplate(
+                        ocr_text, config.extraction.boilerplate_patterns
+                    ):
+                        pc.classification = "boilerplate"
+                        pc.skipped = True
+                        pc.layers_needed = []
                 except Exception:
                     pass
 
     if config.extraction.skip_boilerplate and llm_client:
         from ides.llm.prompts import BOILERPLATE_PROMPT
 
-        for pc in reversed(results):
+        for pc in results:
             if pc.skipped:
                 continue
             try:
                 text = _get_page_text(pdf_path, pc.page_num)
+                if not text and ocr_extractor:
+                    text = await ocr_extractor.quick_ocr(pdf_path, pc.page_num)
                 if not text:
-                    break
+                    continue
                 prompt = BOILERPLATE_PROMPT.format(content=text[:500])
                 model_cfg = {
                     "provider": config.models.filter.provider,
@@ -82,10 +90,8 @@ async def classify_all_pages(
                     pc.skipped = True
                     pc.classification = "boilerplate"
                     pc.layers_needed = []
-                else:
-                    break
             except Exception:
-                break
+                continue
 
     return results
 
