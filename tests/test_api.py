@@ -65,6 +65,43 @@ class TestHealthEndpoint:
         assert response.json()["status"] == "ok"
 
 
+class TestGlobalIPAllowlist:
+    @pytest_asyncio.fixture
+    async def restricted_client(self, tmp_data_dir, db, file_store):
+        from ides.config import AppConfig, ServerConfig, StorageConfig
+        cfg = AppConfig(
+            server=ServerConfig(
+                master_admin_key="test-admin-key",
+                allowed_ips=["10.0.0.1"],
+            ),
+            storage=StorageConfig(base_path=tmp_data_dir),
+        )
+        app = create_app(cfg)
+        app.state.db = db
+        app.state.file_store = file_store
+        app.state.config = cfg
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as c:
+            yield c
+
+    async def test_blocked_ip_gets_403(self, restricted_client):
+        # ASGITransport uses "testclient" as client IP, not in allowed_ips
+        response = await restricted_client.get("/health")
+        assert response.status_code == 403
+        assert response.json()["error"] == "IP not allowed"
+
+    async def test_blocked_ip_cannot_reach_admin(self, restricted_client):
+        response = await restricted_client.get(
+            "/admin/keys", headers={"X-Admin-Key": "test-admin-key"}
+        )
+        assert response.status_code == 403
+
+    async def test_empty_allowlist_permits_all(self, client):
+        # Default config has no allowed_ips — all IPs pass through
+        response = await client.get("/health")
+        assert response.status_code == 200
+
+
 class TestAdminAuth:
     async def test_admin_no_key(self, client):
         response = await client.get("/admin/keys")

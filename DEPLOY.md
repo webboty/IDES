@@ -118,6 +118,9 @@ server:
   host: "127.0.0.1"     # listen on localhost only — nginx proxies externally
   port: 8000
   master_admin_key: "${IDES_ADMIN_KEY}"
+  # allowed_ips:         # optional: restrict entire service to these IPs
+  #   - "1.2.3.4"        # e.g. your n8n server, office IP, VPN exit node
+  #   - "10.0.0.5"       # omit this block (or leave empty) to allow all IPs
 
 storage:
   base_path: "/home/ides/data"    # absolute path recommended in production

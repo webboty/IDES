@@ -73,6 +73,7 @@ class ServerConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8000
     master_admin_key: str = ""
+    allowed_ips: list[str] = Field(default_factory=list)  # empty = allow all
 
 
 class StorageConfig(BaseModel):

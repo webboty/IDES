@@ -233,10 +233,27 @@ response = await asyncio.wait_for(
 
 ## Security Model
 
+Two independent, layered IP controls are available.
+
+**1. Global service allowlist** (`server.allowed_ips` in `config.yaml`)
+
+Blocks the entire service from IPs not on the list. Applied in the middleware before any key validation — no request from an unlisted IP reaches any endpoint.
+
+```yaml
+server:
+  allowed_ips:       # omit or set to [] to allow all IPs
+    - "1.2.3.4"
+    - "10.0.0.5"
+```
+
+**2. Per-key IP restriction** (`allowed_ips` column on each API key)
+
+Restricts an individual API key to specific caller IPs. Other keys from the same IP are unaffected. Set at key creation time via `ides keys create --ips "1.2.3.4,10.0.0.5"` or the admin HTTP API.
+
 **API keys**
 - Generated as `ides_{secrets.token_hex(16)}`
 - Only the SHA-256 hash is stored; the raw key is shown once and never persisted
-- Optional `allowed_ips` (JSON array): requests from other IPs get 401
+- Optional per-key `allowed_ips` (JSON array): requests using that key from other IPs get 401
 - Optional `expires_at`: expired keys get 401 silently
 - Soft-delete (`is_active = 0`) — revoked keys remain in DB for audit
 
@@ -244,10 +261,11 @@ response = await asyncio.wait_for(
 - Single master key from `config.server.master_admin_key` (env var recommended)
 - Guard checks `if not expected or not admin_key or admin_key != expected` — prevents bypass when the env var is unset (empty string would otherwise match an empty header)
 
-**Middleware** (`security.py`)
-- `/admin/*` → admin key check
-- `/extract` and `/jobs/*` → API key verification + IP check + expiry check + `last_used_at` update
-- All other paths (health checks) → pass through
+**Middleware order** (`security.py`)
+1. Global IP allowlist check → 403 if IP not listed (when list is non-empty)
+2. `/admin/*` → admin key check → 401 if invalid
+3. `/extract`, `/jobs/*` → API key + per-key IP + expiry → 401 if any check fails, then `last_used_at` update
+4. All other paths (health checks) → pass through
 
 ---
 

@@ -2,6 +2,10 @@ server:
   host: "0.0.0.0"
   port: 8000
   master_admin_key: "${IDES_ADMIN_KEY}"
+  # allowed_ips: []        # empty (default) = allow all IPs
+  # allowed_ips:           # restrict entire service to specific IPs:
+  #   - "1.2.3.4"
+  #   - "10.0.0.5"
 
 storage:
   base_path: "./data"

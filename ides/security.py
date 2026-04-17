@@ -57,6 +57,13 @@ def create_auth_middleware(app: Any, config: AppConfig):
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next: Any):
         path = request.url.path
+        client_ip = request.client.host if request.client else "unknown"
+
+        allowed_ips = config.server.allowed_ips
+        if allowed_ips and client_ip not in allowed_ips:
+            return JSONResponse(
+                status_code=403, content={"error": "IP not allowed"}
+            )
 
         if path.startswith("/admin"):
             admin_key = request.headers.get("X-Admin-Key")
@@ -69,7 +76,6 @@ def create_auth_middleware(app: Any, config: AppConfig):
 
         if path == "/extract" or path.startswith("/jobs"):
             api_key = request.headers.get("X-API-Key")
-            client_ip = request.client.host if request.client else "unknown"
             db = getattr(request.app.state, "db", None)
             if db is None:
                 return JSONResponse(
