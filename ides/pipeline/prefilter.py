@@ -97,6 +97,16 @@ async def classify_all_pages(
             except Exception:
                 continue
 
+    if config.extraction.skip_boilerplate:
+        found_boilerplate = False
+        for pc in results:
+            if found_boilerplate and not pc.skipped:
+                pc.skipped = True
+                pc.classification = "boilerplate"
+                pc.layers_needed = []
+            if pc.skipped:
+                found_boilerplate = True
+
     return results
 
 
