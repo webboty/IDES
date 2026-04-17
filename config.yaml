@@ -19,19 +19,19 @@ providers:
 models:
   vision:
     provider: "local"
-    name: "qwen3.5-35b-a3b@bf16"
+    name: "infinity-parser-7b@q4_k_s"
     max_tokens: 4000
   merge:
     provider: "local"
-    name: "qwen3.5-35b-a3b@bf16"
+    name: "qwen3.5-35b-a3b@4bit"
     max_tokens: 4000
   filter:
-    provider: "openai"
-    name: "gpt-5.4-nano"
+    provider: "local"
+    name: "qwen3.5-35b-a3b@4bit"
     max_tokens: 200
   image_describe:
     provider: "local"
-    name: "qwen3.5-35b-a3b@bf16"
+    name: "qwen3.5-35b-a3b@4bit"
     max_tokens: 500
 
 extraction:

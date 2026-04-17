@@ -22,9 +22,10 @@ CRITICAL RULES:
 7. Preserve original document language
 8. Do NOT invent content not in any source"""
 
-BOILERPLATE_PROMPT = """Is this page relevant business information or boilerplate (terms/legal/AGB/impressum)?
+BOILERPLATE_CONFIRM_PROMPT = """A regex pattern flagged this page as potential boilerplate (AGB/terms/legal/impressum).
+Is this ENTIRE page boilerplate, or does it contain relevant business data (amounts, dates, line items, order details)?
 Content (first 500 chars): {content}
-Answer ONE word: RELEVANT or BOILERPLATE"""
+Answer ONE word: RELEVANT (keep it) or BOILERPLATE (skip it)"""
 
 IMAGE_DESCRIBE_PROMPT = (
     "Describe this image from a business document briefly. What is it showing?"

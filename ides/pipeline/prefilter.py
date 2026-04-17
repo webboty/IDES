@@ -50,23 +50,24 @@ async def classify_all_pages(
 
     if ocr_extractor:
         for pc in results:
-            if pc.classification in ("scanned",) and not pc.skipped:
-                try:
-                    ocr_text = await ocr_extractor.quick_ocr(pdf_path, pc.page_num)
-                    if len(ocr_text.strip()) < 10:
-                        pc.classification = "image_only"
-                        pc.layers_needed = get_layers_for_classification("image_only")
-                    elif is_boilerplate(
-                        ocr_text, config.extraction.boilerplate_patterns
-                    ):
-                        pc.classification = "boilerplate"
-                        pc.skipped = True
-                        pc.layers_needed = []
-                except Exception:
-                    pass
+            if pc.skipped:
+                continue
+            if pc.classification not in ("scanned", "image_only"):
+                continue
+            try:
+                ocr_text = await ocr_extractor.quick_ocr(pdf_path, pc.page_num)
+                if len(ocr_text.strip()) < 10:
+                    pc.classification = "image_only"
+                    pc.layers_needed = get_layers_for_classification("image_only")
+                elif is_boilerplate(ocr_text, config.extraction.boilerplate_patterns):
+                    pc.classification = "boilerplate"
+                    pc.skipped = True
+                    pc.layers_needed = []
+            except Exception:
+                pass
 
     if config.extraction.skip_boilerplate and llm_client:
-        from ides.llm.prompts import BOILERPLATE_PROMPT
+        from ides.llm.prompts import BOILERPLATE_CONFIRM_PROMPT
 
         for pc in results:
             if pc.skipped:
@@ -77,7 +78,9 @@ async def classify_all_pages(
                     text = await ocr_extractor.quick_ocr(pdf_path, pc.page_num)
                 if not text:
                     continue
-                prompt = BOILERPLATE_PROMPT.format(content=text[:500])
+                if not is_boilerplate(text, config.extraction.boilerplate_patterns):
+                    continue
+                prompt = BOILERPLATE_CONFIRM_PROMPT.format(content=text[:500])
                 model_cfg = {
                     "provider": config.models.filter.provider,
                     "name": config.models.filter.name,
@@ -86,10 +89,11 @@ async def classify_all_pages(
                 response = await llm_client.chat(
                     model_cfg, [{"role": "user", "content": prompt}]
                 )
-                if "BOILERPLATE" in response.upper():
-                    pc.skipped = True
-                    pc.classification = "boilerplate"
-                    pc.layers_needed = []
+                if "RELEVANT" in response.upper():
+                    continue
+                pc.skipped = True
+                pc.classification = "boilerplate"
+                pc.layers_needed = []
             except Exception:
                 continue
 
