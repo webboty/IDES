@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import asyncio
 import signal
 from contextlib import asynccontextmanager
@@ -144,22 +143,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 app = create_app()
 
 
-def cli():
-    parser = argparse.ArgumentParser(
-        description="IDES - Intelligent Document Extraction System"
-    )
-    parser.add_argument("--config", default="config.yaml", help="Path to config file")
-    parser.add_argument("--host", default=None, help="Override host")
-    parser.add_argument("--port", type=int, default=None, help="Override port")
-    args = parser.parse_args()
-
-    config = load_config(args.config)
-    host = args.host or config.server.host
-    port = args.port or config.server.port
-
-    app = create_app(config)
-    uvicorn.run(app, host=host, port=port)
-
-
 if __name__ == "__main__":
-    cli()
+    from ides.cli import main
+    main()
