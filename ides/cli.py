@@ -414,7 +414,7 @@ def _systemctl(action: str, args):
         err = result.stderr.strip()
         if any(x in err for x in ("not found", "not loaded", "not-found")):
             print(yellow("Systemd service 'ides' is not installed."))
-            print(dim("  See DEPLOY.md §6 to set it up."))
+            print(dim("  See DEPLOY.md §7 to set it up."))
         else:
             print(red(f"systemctl {action} ides: {err or 'unknown error'}"))
 

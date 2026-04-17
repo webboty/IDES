@@ -281,7 +281,38 @@ Port 8000 is **not** opened externally — nginx proxies to it on localhost.
 
 ---
 
-## 9. First-Run Verification
+## 9. CLI Management Tool
+
+The `ides` CLI is installed with the package and lets you manage keys, jobs, and the server from the command line. Most commands connect directly to SQLite — **the server does not need to be running**.
+
+See **[CLI.md](CLI.md)** for the full command reference.
+
+Quick examples:
+
+```bash
+# Create your first API key before starting the server
+ides --config /home/ides/app/config.yaml keys create --name n8n-prod --owner admin
+
+# Check server and worker state
+ides status
+
+# View recent jobs
+ides jobs list --limit 20
+
+# Clean up job files older than 30 days
+ides jobs cleanup --older-than 30
+
+# Check LLM provider config and live connectivity
+ides llm --test
+
+# Restart / stop via systemd
+ides restart
+ides stop
+```
+
+---
+
+## 10. First-Run Verification
 
 ```bash
 # Health check
@@ -292,12 +323,15 @@ curl https://your-domain.com/health
 curl https://your-domain.com/health/llm
 # Expected: both local and openai showing "ok" (or "timeout" if no Tailscale yet)
 
-# Create your first API key
+# Create your first API key (via CLI — no server needed)
+ides --config /home/ides/app/config.yaml keys create --name n8n-production --owner n8n
+# Copy the printed key — it is shown only once
+
+# Or via the admin HTTP API if the server is already running:
 curl -X POST https://your-domain.com/admin/keys \
   -H "X-Admin-Key: your-very-long-random-admin-key-here" \
   -H "Content-Type: application/json" \
   -d '{"name": "n8n-production", "owner": "n8n"}'
-# Save the returned "key" field — it is shown only once
 
 # Test extraction
 curl -X POST https://your-domain.com/extract \
@@ -309,7 +343,7 @@ curl -X POST https://your-domain.com/extract \
 
 ---
 
-## 10. n8n Integration
+## 11. n8n Integration
 
 In n8n, use an **HTTP Request** node:
 
@@ -334,7 +368,7 @@ In n8n, use an **HTTP Request** node:
 
 ---
 
-## 11. Data Layout
+## 12. Data Layout
 
 Jobs are stored under `storage.base_path`:
 
@@ -381,7 +415,7 @@ FROM jobs GROUP BY job_date ORDER BY job_date DESC;
 
 ---
 
-## 12. Maintenance
+## 13. Maintenance
 
 ### Backup
 
@@ -434,7 +468,7 @@ systemctl status ides
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 | Symptom | Check |
 |---|---|
