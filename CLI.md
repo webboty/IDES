@@ -2,6 +2,39 @@
 
 The `ides` command-line tool lets you manage the server, API keys, and jobs directly from the terminal — without needing a running server for most operations (keys and job management talk to SQLite directly).
 
+---
+
+## Installation
+
+`ides` is installed automatically as a script entry point when you `pip install -e .`:
+
+```bash
+source .venv/bin/activate
+pip install -e .
+
+ides --help   # should work immediately
+```
+
+### Using `ides` without activating the virtualenv
+
+On production servers you often want to call `ides` from any shell without first running `source .venv/bin/activate`. The easiest approach is a shell alias pointing directly at the venv binary:
+
+```bash
+# Add to ~/.bashrc (or ~/.zshrc)
+alias ides='/home/ides/app/.venv/bin/ides'
+```
+
+Reload the shell:
+```bash
+source ~/.bashrc
+```
+
+Now `ides jobs list`, `ides status`, etc. work from any directory in any shell session without activating the venv.
+
+> On the production server an alias like this is already in place — you can use all `ides` commands directly.
+
+---
+
 ## Global option
 
 ```
