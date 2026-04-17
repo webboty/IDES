@@ -68,10 +68,8 @@ class LLMClient:
                 timeout=timeout,
             )
         except asyncio.TimeoutError:
-            self._available[provider] = False
             raise ExtractionError(f"LLM timeout for model {model_config['name']}")
         except Exception as e:
-            self._available[provider] = False
             raise ExtractionError(f"LLM error: {str(e)[:200]}")
 
         text = response.choices[0].message.content or ""
