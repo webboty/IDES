@@ -156,6 +156,7 @@ extraction:
     ocr: 300
   ocr_languages: "deu+eng+rus"
   max_pages: 50
+  max_file_size_mb: 50
   skip_boilerplate: true
   boilerplate_patterns:
     - "(?i)allgemeine.{0,5}geschäft"
@@ -240,7 +241,7 @@ server {
     listen 80;
     server_name your-domain.com;    # replace with your domain or server IP
 
-    # Increase for large PDF uploads
+    # Must be >= extraction.max_file_size_mb in config.yaml
     client_max_body_size 50M;
 
     location / {

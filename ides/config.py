@@ -38,6 +38,7 @@ class ExtractionConfig(BaseModel):
     dpi: DPIConfig = DPIConfig()
     ocr_languages: str = "deu+eng+rus"
     max_pages: int = 50
+    max_file_size_mb: int = 50
     skip_boilerplate: bool = True
     boilerplate_patterns: list[str] = Field(
         default_factory=lambda: [

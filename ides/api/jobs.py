@@ -88,6 +88,14 @@ async def extract_pdf(request: Request):
     if not pdf_bytes:
         raise HTTPException(400, "Empty file")
 
+    max_bytes = config.extraction.max_file_size_mb * 1024 * 1024
+    if len(pdf_bytes) > max_bytes:
+        raise HTTPException(
+            400,
+            f"File too large: {len(pdf_bytes) // (1024 * 1024)} MB, "
+            f"max is {config.extraction.max_file_size_mb} MB",
+        )
+
     try:
         import fitz
 
