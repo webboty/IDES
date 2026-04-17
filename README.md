@@ -38,15 +38,34 @@ The result: high accuracy at a fraction of the cost of "send everything to GPT-4
 
 ```mermaid
 flowchart TD
-    Client["Client\n(n8n / curl / API)"]
+    subgraph Extraction["Extraction"]
+        r1["POST /extract"]
+        r2["GET /jobs/{id}"]
+        r3["GET /jobs/{id}/result"]
+        r4["GET /jobs/{id}/detail"]
+    end
 
-    Client -->|every request| IP{"① IP Allowlist\nserver.allowed_ips\n─────────────\nempty = allow all\nnon-empty = listed IPs only"}
+    subgraph Admin["Admin"]
+        r5["POST /admin/keys"]
+        r6["GET /admin/keys"]
+        r7["DELETE /admin/keys/{id}"]
+    end
+
+    subgraph Health["Health"]
+        r8["GET /health"]
+        r9["GET /health/llm"]
+    end
+
+    Extraction & Admin & Health --> IP{"① IP Allowlist\nserver.allowed_ips\n──────────────\nempty = allow all\nnon-empty = listed IPs only"}
+
     IP -->|IP not listed → 403| Denied["Request Denied"]
-    IP -->|IP allowed| Auth{"② Endpoint Auth\n─────────────\n/health → public, no key\n/admin/* → X-Admin-Key\n/extract, /jobs/* → X-API-Key"}
+    IP -->|IP allowed| Auth{"② Endpoint Auth\n──────────────\n/health → public, no key\n/admin/* → X-Admin-Key\n/extract · /jobs/* → X-API-Key"}
     Auth -->|invalid key → 401| Denied
     Auth -->|valid| API["FastAPI\nHTTP Layer"]
 
-    API -->|"job_id · status · markdown"| Client
+    API -->|"job_id · status · markdown"| Extraction
+    API -->|"key id · key list · deleted"| Admin
+    API -->|"ok · provider status"| Health
     API -->|create job| DB[(SQLite)]
     FS -->|result| API
 
