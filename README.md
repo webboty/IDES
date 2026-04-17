@@ -40,9 +40,9 @@ The result: high accuracy at a fraction of the cost of "send everything to GPT-4
 flowchart TD
     Client["Client\n(n8n / curl / API)"]
 
-    Client -->|any request| IPCheck{"① Global IP\nAllowlist\nserver.allowed_ips"}
+    Client -->|"every request"| IPCheck{"① IP Allowlist\nserver.allowed_ips\napplied to ALL traffic"}
     IPCheck -->|"IP not listed → 403"| Denied["Request denied"]
-    IPCheck -->|"IP allowed\nor no list set"| AuthCheck{"② API Key\nor Admin Key"}
+    IPCheck -->|"IP listed\n(allowlist empty = everyone passes)"| AuthCheck{"② Key Check\nAPI Key or Admin Key"}
     AuthCheck -->|"invalid → 401"| Denied
     AuthCheck -->|valid| API["FastAPI\nHTTP Layer"]
 
@@ -79,6 +79,9 @@ flowchart TD
     FA -.->|primary| Local
     FA -.->|fallback| OAI
 ```
+
+> **Every request — without exception — passes through both checks in order.**
+> The IP allowlist is opt-in: leave `server.allowed_ips` empty (the default) to allow all IPs, or populate it to lock the entire service down to specific addresses before any key validation even runs.
 
 ---
 
