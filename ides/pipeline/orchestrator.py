@@ -215,6 +215,9 @@ async def run_pipeline(
                 pc.classification, layer_results, fusion_agent, pc.page_num
             )
         except Exception:
+            page_markdown = ""
+
+        if not page_markdown.strip():
             page_markdown = _fallback_fuse(pc.classification, layer_results)
 
         file_store.save_fusion_page(job_id, pc.page_num, page_markdown)
